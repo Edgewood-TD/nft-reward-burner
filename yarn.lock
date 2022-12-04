@@ -4280,10 +4280,10 @@ near-ledger-js@^0.2.0:
     bs58 "^4.0.1"
     platform "^1.3.6"
 
-near-sandbox@^0.0.8:
-  version "0.0.8"
-  resolved "https://registry.npmjs.org/near-sandbox/-/near-sandbox-0.0.8.tgz#5496e300554e9e722fa200204dc8cd302e0074c7"
-  integrity sha512-3JrDcA9rI+wA9lWqfOtSovGxBE/TDZL011TLk+jz5wGezVbm7m3tDh/zCfq+++eFyJ3ZbGkG0KF6+trMQJFPQQ==
+near-sandbox@^0.0.14:
+  version "0.0.14"
+  resolved "https://registry.npmjs.org/near-sandbox/-/near-sandbox-0.0.14.tgz#716c22ce547a725d95e7989e051835b785ee28fa"
+  integrity sha512-wQ1jcD6W6U4V83D0Zxgi2qedMkmTh5iiqm2t/oriKR4rrTql/j8QR/Ip/NfoIH/plFT+vGungKL+B4HxfNyyNg==
   dependencies:
     got "^11.8.2"
     tar "^6.1.0"
@@ -4305,10 +4305,10 @@ near-units@^0.1.9:
   dependencies:
     bn.js "^5.2.0"
 
-near-workspaces@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.npmjs.org/near-workspaces/-/near-workspaces-2.0.0.tgz#32f7c6999bca8209b7a173986c7ce08218506ebc"
-  integrity sha512-oxV9B/LBGKM1cQHfZI476GSiUFLRg/0t7PiPGDyUVVsFWpkBLbQEF9EVP2nxctO7HWopAe5SJJTGp0o0ct8B1A==
+near-workspaces@^3.2.2:
+  version "3.2.2"
+  resolved "https://registry.npmjs.org/near-workspaces/-/near-workspaces-3.2.2.tgz#8e81c32750c85238d1615032809a4f8da300bdae"
+  integrity sha512-Y26FyPccs3lTKFpOzeWQy5urtSe0hcdME4ePbidzHNQPOXCub06htnvsoVEUNGVejc50f5nVHcdCiYO8mtEdTA==
   dependencies:
     base64url "^3.0.1"
     bn.js "^5.2.0"
@@ -4318,7 +4318,7 @@ near-workspaces@^2.0.0:
     fs-extra "^10.0.0"
     js-sha256 "^0.9.0"
     near-api-js "^0.44.1"
-    near-sandbox "^0.0.8"
+    near-sandbox "^0.0.14"
     near-units "^0.1.9"
     node-port-check "^2.0.1"
     promisify-child-process "^4.1.1"

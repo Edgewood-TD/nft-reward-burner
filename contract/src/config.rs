@@ -10,8 +10,12 @@ impl Contract {
 
         self.metadata = LazyOption::new(StorageKey::Metadata.try_to_vec().unwrap(), Some(&metadata))
     }
-
+    pub fn set_accepted_nft(&mut self, accepted_nft: AccountId) {
+        self.assert_owner(env::signer_account_id());
+        self.accepted_nft = Some(accepted_nft);
+    }
     pub fn update_nft_name(&mut self, name: String) {
+        self.assert_owner(env::signer_account_id());
         let mut metadata = self.metadata.get().unwrap();
         metadata.name = name;
         self.metadata = LazyOption::new(StorageKey::Metadata.try_to_vec().unwrap(), Some(&metadata))
@@ -31,18 +35,5 @@ impl Contract {
     pub fn set_mint_price(&mut self, price: Balance) {
         self.assert_owner(env::signer_account_id());
         self.mint_price = price;
-    }
-    pub fn set_wl_mint_price(&mut self, price: Balance) {
-        self.assert_owner(env::signer_account_id());
-        self.wl_price = price;
-    }
-
-    pub fn update_drop_supply(&mut self, add_supply: u128) {
-        self.assert_owner(env::signer_account_id());
-        self.max_supply = add_supply;
-        self.available_nft = Raffle::new(
-            StorageKey::AvailableNft.try_to_vec().unwrap(),
-            add_supply.try_into().unwrap(),
-        )
     }
 }

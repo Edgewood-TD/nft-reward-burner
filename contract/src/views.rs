@@ -19,10 +19,9 @@ impl Contract {
     pub fn get_mint_price(&self) -> Balance {
         return self.mint_price;
     }
-    pub fn get_wl_mint_price(&self) -> Balance {
-        return self.wl_price;
-    }
-    pub fn get_wl_amount(&self, account_id: AccountId) -> u32 {
-        self.whitelist.get(&account_id).unwrap_or(0)
+    pub fn storage_balance_of(&self, account_id: AccountId) -> U128 {
+        self.account_storage_balance
+            .get(&account_id)
+            .unwrap_or_else(|| U128(0))
     }
 }

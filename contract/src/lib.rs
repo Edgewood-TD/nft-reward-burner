@@ -4,24 +4,23 @@ use near_contract_standards::non_fungible_token::metadata::{
 use near_contract_standards::non_fungible_token::NonFungibleToken;
 use near_contract_standards::non_fungible_token::{Token, TokenId};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LazyOption, UnorderedMap, Vector};
+use near_sdk::collections::{LazyOption, UnorderedMap};
 use near_sdk::json_types::U128;
+use near_sdk::store::Vector;
 use near_sdk::{
-    env, log, near_bindgen, require, AccountId, Balance, BorshStorageKey, PanicOnDefault, Promise,
-    PromiseOrValue, ONE_NEAR,
+    env, near_bindgen, require, AccountId, Balance, BorshStorageKey, PanicOnDefault, Promise,
+    PromiseOrValue,
 };
 use std::collections::HashMap;
 mod config;
 mod constants;
 mod mint;
+mod nft_receiver;
 mod payouts;
-mod raffle;
 mod utils;
 mod views;
 use constants::*;
 use payouts::*;
-use raffle::*;
-use utils::*;
 
 // Define the contract structure
 #[near_bindgen]
@@ -32,18 +31,14 @@ pub struct Contract {
     royalties: LazyOption<Royalties>,
 
     max_supply: u128,
-    whitelist: UnorderedMap<AccountId, u32>,
-    free_mint_list: UnorderedMap<AccountId, u32>,
-
     mint_price: Balance,
-    wl_price: Balance,
-    available_nft: Raffle,
-
     sales_active: bool,
     pre_sale_active: bool,
-
     description: String,
     file_extension: String,
+    account_storage_balance: UnorderedMap<AccountId, U128>,
+    accepted_nft: Option<AccountId>,
+    burned_tokens: UnorderedMap<AccountId, Vector<TokenId>>,
 }
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
@@ -53,56 +48,31 @@ enum StorageKey {
     Enumeration,
     Approval,
     Royalties,
-    //Custom
-    Whitelist,
-    FreeMintList,
-    AvailableNft,
+    AccountStorageBalance,
+    BurnedTokens,
+    BurnedTokensInner { account_id: AccountId },
 }
 
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new_init(
-        owner_id: AccountId,
-        mint_price: Balance,
-        wl_price: Option<Balance>,
-        max_supply: u128,
-        nft_name: String,
-        nft_symbol: String,
-        icon: String,
-        base_uri: String,
-        description: String,
-        file_extension: String,
-    ) -> Self {
+    pub fn new_init(owner_id: AccountId) -> Self {
         Self::new(
             owner_id,
             NFTContractMetadata {
                 spec: NFT_METADATA_SPEC.to_string(),
-                name: nft_name,
-                symbol: nft_symbol,
-                icon: Some(icon),
-                base_uri: Some(base_uri),
+                name: NFT_NAME.to_string(),
+                symbol: NFT_SYMBOL.to_string(),
+                icon: Some(ICON.to_string()),
+                base_uri: Some(BASE_URI.to_string()),
                 reference: None,
                 reference_hash: None,
             },
-            mint_price,
-            wl_price,
-            max_supply,
-            description,
-            file_extension,
         )
     }
 
     #[init]
-    pub fn new(
-        owner_id: AccountId,
-        metadata: NFTContractMetadata,
-        mint_price: Balance,
-        wl_price: Option<Balance>,
-        max_supply: u128,
-        description: String,
-        file_extension: String,
-    ) -> Self {
+    pub fn new(owner_id: AccountId, metadata: NFTContractMetadata) -> Self {
         assert!(!env::state_exists(), "Already initialized");
 
         metadata.assert_valid();
@@ -122,61 +92,65 @@ impl Contract {
             ),
             metadata: LazyOption::new(StorageKey::Metadata, Some(&metadata)),
             //custom
-            max_supply: max_supply,
+            max_supply: MAX_SUPPLY,
             sales_active: false,
             pre_sale_active: false,
-            whitelist: UnorderedMap::new(StorageKey::Whitelist.try_to_vec().unwrap()),
-            royalties: LazyOption::new(StorageKey::Royalties, Some(&royalties)),
-            mint_price: mint_price,
-            wl_price: wl_price.unwrap_or(mint_price),
-            free_mint_list: UnorderedMap::new(StorageKey::FreeMintList.try_to_vec().unwrap()),
-            available_nft: Raffle::new(
-                StorageKey::AvailableNft.try_to_vec().unwrap(),
-                max_supply.try_into().unwrap(),
+            account_storage_balance: UnorderedMap::new(
+                StorageKey::AccountStorageBalance.try_to_vec().unwrap(),
             ),
-            description,
-            file_extension,
+            royalties: LazyOption::new(StorageKey::Royalties, Some(&royalties)),
+            mint_price: MINT_PRICE,
+            accepted_nft: None,
+            description: DESCRIPTION.to_string(),
+            file_extension: FILE_EXTENSION.to_string(),
+            burned_tokens: UnorderedMap::new(StorageKey::BurnedTokens.try_to_vec().unwrap()),
         };
 
         this
     }
-    #[init(ignore_state)]
-    pub fn migrate(owner_id: AccountId) -> Self {
-        let prev: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
-        assert_eq!(
-            prev.tokens.owner_id,
-            env::signer_account_id(),
-            "Only owner can call this method"
-        );
-        let mut perpetual_royalties: HashMap<AccountId, u8> = HashMap::new();
-        perpetual_royalties.insert(owner_id, 100);
-        let royalties: Royalties = Royalties {
-            accounts: perpetual_royalties,
-            percent: 5,
-        };
-
-        let metadata = prev.metadata.get().unwrap();
-        // let prev_base_uri = prev.metadata.get().unwrap().base_uri.unwrap();
-        let this = Contract {
-            tokens: prev.tokens,
-            metadata: LazyOption::new(StorageKey::Metadata, Some(&metadata)),
-            max_supply: prev.max_supply,
-            whitelist: prev.whitelist,
-            royalties: LazyOption::new(StorageKey::Royalties, Some(&royalties)),
-            mint_price: prev.mint_price,
-            wl_price: prev.wl_price,
-            sales_active: prev.sales_active,
-            pre_sale_active: prev.pre_sale_active,
-            free_mint_list: prev.free_mint_list,
-            available_nft: Raffle::new(
-                StorageKey::AvailableNft.try_to_vec().unwrap(),
-                prev.max_supply.try_into().unwrap(),
-            ),
-            description: prev.description,
-            file_extension: prev.file_extension,
-        };
-
-        this
+    pub fn storage_deposit(&mut self, account_id: Option<AccountId>) -> U128 {
+        let account = account_id.unwrap_or_else(|| env::predecessor_account_id());
+        let mut storage_balance = self
+            .account_storage_balance
+            .get(&account)
+            .unwrap_or_else(|| {
+                self.account_storage_balance
+                    .insert(&account, &U128(0))
+                    .unwrap();
+                U128(0)
+            });
+        let attached_deposit = env::attached_deposit();
+        if attached_deposit > 0 {
+            storage_balance.0 += attached_deposit;
+            self.account_storage_balance
+                .insert(&account, &storage_balance)
+                .unwrap();
+        }
+        storage_balance
+    }
+}
+impl Contract {
+    pub fn process_storage(&mut self, account_id: AccountId, init_storage: Balance) {
+        let current_storage = env::storage_usage() as u128;
+        if init_storage > current_storage {
+            //REFUND
+            let refund = init_storage - current_storage;
+            let new_balance =
+                U128(self.account_storage_balance.get(&account_id).unwrap().0 + refund);
+            self.account_storage_balance
+                .insert(&account_id, &new_balance);
+        } else {
+            //CHARGE
+            let charge = current_storage - init_storage;
+            let mut account_balance = self.account_storage_balance.get(&account_id).unwrap().0;
+            if account_balance > charge {
+                account_balance -= charge;
+                self.account_storage_balance
+                    .insert(&account_id, &U128(account_balance));
+            } else {
+                env::panic_str("not enough storage balance");
+            }
+        }
     }
 }
 
